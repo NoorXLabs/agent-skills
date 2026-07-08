@@ -1,34 +1,39 @@
-# MCP Migration Reference
 
-The `tanstack mcp` command was removed in CLI v0.52.0. All agent workflows now use direct CLI commands with `--json` output.
+---
+id: mcp-migration
+title: MCP Migration
+---
+
+`tanstack mcp` has been removed from the CLI.
+
+Use direct CLI commands for agent introspection and automation.
 
 ## Command Mapping
 
 | Old MCP Tool | New CLI Command |
 |---|---|
-| `listTanStackAddOns` | `tanstack create --list-add-ons --framework <f> --json` |
-| `getAddOnDetails` | `tanstack create --addon-details <id> --framework <f> --json` |
-| `createTanStackApplication` | `tanstack create <name> --framework <f> --add-ons <a,b> -y` |
-| `addAddOnToProject` | `tanstack add <id1> <id2>` |
+| `listTanStackAddOns` | `tanstack create --list-add-ons --framework React --json` |
+| `getAddOnDetails` | `tanstack create --addon-details drizzle --framework React --json` |
+| `createTanStackApplication` | `tanstack create my-app --framework React --add-ons drizzle,clerk` |
 | `tanstack_list_libraries` | `tanstack libraries --json` |
-| `tanstack_doc` | `tanstack doc <library> <path> --json` |
-| `tanstack_search_docs` | `tanstack search-docs "<query>" --json` |
-| `tanstack_ecosystem` | `tanstack ecosystem --json` |
+| `tanstack_doc` | `tanstack doc query framework/react/overview --json` |
+| `tanstack_search_docs` | `tanstack search-docs "server functions" --library start --json` |
+| `tanstack_ecosystem` | `tanstack ecosystem --category database --json` |
 
-## Key Differences
+## Recommended Agent Workflow
 
-1. **No server process** — CLI commands are stateless. Run them directly, parse the JSON output, and move on. No persistent connection needed.
-2. **`--json` flag replaces MCP protocol** — all structured output comes via `--json` on stdout.
-3. **`--framework` is often required** — add-on queries need a framework to return accurate compatibility data.
-4. **Global install** — the CLI is installed globally. Run commands directly as `tanstack <command>`.
+Use JSON output for deterministic parsing:
 
-## Third-Party MCP Wrapper
+```bash
+tanstack create --list-add-ons --framework React --json
+tanstack create --addon-details tanstack-query --framework React --json
+tanstack libraries --json
+tanstack search-docs "loaders" --library router --framework react --json
+tanstack ecosystem --category auth --json
+```
 
-If a user specifically needs MCP protocol support (e.g. for Claude Desktop or Cursor), a community wrapper exists at `@g7aro/tanstack-mcp` which spawns the CLI under the hood and exposes the old MCP tool interface. However, for agent skills, direct CLI invocation is simpler and avoids the extra dependency.
+## Important Notes
 
-## Common Mistakes
-
-- **Using `tanstack mcp start`** — This command no longer exists. It will fail.
-- **Referencing old MCP tool names in code** — Replace with CLI equivalents from the mapping table above.
-- **Not passing `--framework`** — Add-on availability and details are framework-specific. Omitting it may return incomplete or incorrect data.
-- **Using `--integrations` instead of `--add-ons`** — The flag was renamed. Use `--add-ons`.
+- The CLI MCP server is removed and will not be restored.
+- Existing MCP client configs pointing to `@tanstack/cli mcp` will break and should be removed.
+- The app-level `mcp` add-on is still available for projects that want to host their own MCP endpoints.

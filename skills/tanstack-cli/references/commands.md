@@ -1,251 +1,314 @@
-# TanStack CLI Command Reference
 
-## Table of Contents
-
-1. [tanstack create](#tanstack-create)
-2. [tanstack add](#tanstack-add)
-3. [tanstack doc](#tanstack-doc)
-4. [tanstack search-docs](#tanstack-search-docs)
-5. [tanstack libraries](#tanstack-libraries)
-6. [tanstack ecosystem](#tanstack-ecosystem)
-7. [tanstack pin-versions](#tanstack-pin-versions)
-8. [tanstack addon](#tanstack-addon)
-9. [tanstack starter](#tanstack-starter)
-
+---
+id: cli-reference
+title: CLI Reference
 ---
 
 ## tanstack create
 
 Create a new TanStack application. By default creates a TanStack Start app with SSR.
 
-```sh
+```bash
 tanstack create [project-name] [options]
 ```
 
-### Options
+| Option | Description |
+|--------|-------------|
+| `--add-ons <ids>` | Comma-separated add-on IDs |
+| `--template <url-or-id>` | Template URL/path or built-in template ID |
+| `--package-manager <pm>` | `npm`, `pnpm`, `yarn`, `bun`, `deno` |
+| `--framework <name>` | `React`, `Solid` |
+| `--router-only` | Create file-based Router-only app without TanStack Start (add-ons/deployment/template disabled) |
+| `--toolchain <id>` | Toolchain add-on (use `--list-add-ons` to see options) |
+| `--deployment <id>` | Deployment add-on (use `--list-add-ons` to see options) |
+| `--examples` / `--no-examples` | Include or exclude demo/example pages |
+| `--tailwind` / `--no-tailwind` | Deprecated compatibility flags; accepted but ignored (Tailwind is always enabled) |
+| `--no-git` | Skip git init |
+| `--no-install` | Skip dependency install |
+| `-y, --yes` | Use defaults, skip prompts |
+| `--interactive` | Force interactive mode |
+| `--target-dir <path>` | Custom output directory |
+| `-f, --force` | Overwrite existing directory |
+| `--list-add-ons` | List all available add-ons |
+| `--addon-details <id>` | Show details for specific add-on |
+| `--json` | Output machine-readable JSON for automation |
+| `--add-on-config <json>` | JSON string with add-on options |
 
-| Flag | Description |
-|---|---|
-| `--framework <name>` | Framework to use (e.g. `React`, `Solid`) |
-| `--add-ons <ids>` | Comma-separated add-on IDs to include |
-| `--router-only` | Create a Router-only SPA (no SSR, no Start) |
-| `--toolchain <name>` | Linting/formatting toolchain (`eslint`, `biome`) |
-| `--deployment <target>` | Deployment target (`vercel`, `netlify`, `cloudflare`, etc.) |
-| `--package-manager <pm>` | Package manager (`npm`, `pnpm`, `yarn`, `bun`, `deno`) |
-| `--template <url-or-name>` | Use a starter template (URL or built-in name) |
-| `--starter <url-or-path>` | Use a starter preset JSON |
-| `--no-examples` | Skip example route/component generation |
-| `--interactive` | Force interactive mode for add-on selection |
-| `-y` | Accept all defaults (non-interactive) |
-| `--list-add-ons` | List available add-ons (does not create a project) |
-| `--addon-details <id>` | Show details for a specific add-on (does not create a project) |
-| `--json` | Output as JSON (for agent/programmatic consumption) |
-| `--git` / `--no-git` | Initialize git repository (default: true) |
-
-### Introspection Mode (no project created)
-
-These flags query add-on metadata without scaffolding anything — ideal for agent discovery:
-
-```sh
-# List all available add-ons as JSON
-tanstack create --list-add-ons --framework React --json
-
-# Get detailed info on one add-on (dependencies, conflicts, configurable options)
-tanstack create --addon-details drizzle --framework React --json
-```
-
-### Examples
-
-```sh
+```bash
+# Examples
 tanstack create my-app -y
 tanstack create my-app --add-ons clerk,drizzle,tanstack-query
 tanstack create my-app --router-only --toolchain eslint --no-examples
 tanstack create my-app --template https://example.com/template.json
 tanstack create my-app --template ecommerce
+tanstack create --list-add-ons --framework React --json
+tanstack create --addon-details drizzle --framework React --json
+```
+
+### Programmatic generation
+
+Use `@tanstack/create/worker` in Cloudflare Workers and other edge SSR runtimes. It does not import the generated template manifest at module startup. Instead, provide a loader for the framework and add-on chunks your Worker supports.
+
+The default `@tanstack/create` export is still the Node/CLI path and scans framework templates from disk. `@tanstack/create/edge` remains the bundled in-memory manifest path; it is Worker-compatible at runtime, but it imports the full generated manifest and is not appropriate for size-constrained Worker bundles.
+
+```ts
+import {
+  createMemoryEnvironment,
+  createWorkerCreate,
+  createWorkerManifestLoader,
+} from '@tanstack/create/worker'
+import { manifestCatalog } from '@tanstack/create/worker-manifest/catalog'
+
+import type {
+  WorkerAddOnManifestModule,
+  WorkerFrameworkManifestModule,
+} from '@tanstack/create/worker'
+
+const frameworkLoaders: Record<
+  string,
+  () => Promise<WorkerFrameworkManifestModule>
+> = {
+  react: () => import('@tanstack/create/worker-manifest/frameworks/react'),
+}
+
+const addOnLoaders: Record<
+  string,
+  Record<string, () => Promise<WorkerAddOnManifestModule>>
+> = {
+  react: {
+    'tanstack-query': () =>
+      import(
+        '@tanstack/create/worker-manifest/frameworks/react/add-ons/tanstack-query'
+      ),
+    cloudflare: () =>
+      import(
+        '@tanstack/create/worker-manifest/frameworks/react/add-ons/cloudflare'
+      ),
+  },
+}
+
+const create = createWorkerCreate(
+  createWorkerManifestLoader({
+    loadCatalog: async () => manifestCatalog,
+    async loadFramework(frameworkId) {
+      const load = frameworkLoaders[frameworkId]
+      if (!load) throw new Error(`Unsupported framework: ${frameworkId}`)
+      return load()
+    },
+    async loadAddOn(frameworkId, addOnId) {
+      const load = addOnLoaders[frameworkId]?.[addOnId]
+      if (!load) throw new Error(`Unsupported add-on: ${addOnId}`)
+      return load()
+    },
+  }),
+)
+
+const framework = await create.getFrameworkById('react')
+const chosenAddOns = await create.finalizeAddOns(framework!, 'file-router', [
+  'tanstack-query',
+  'cloudflare',
+])
+const addOnOptions = create.populateAddOnOptionsDefaults(chosenAddOns)
+const { environment, output } = createMemoryEnvironment('/app')
+
+await create.createApp(environment, {
+  projectName: 'app',
+  targetDir: '/app',
+  framework: framework!,
+  mode: 'file-router',
+  typescript: true,
+  tailwind: true,
+  packageManager: 'pnpm',
+  git: false,
+  install: false,
+  intent: false,
+  chosenAddOns,
+  addOnOptions,
+})
+
+// output.files contains generated files for ZIP creation.
 ```
 
 ---
 
 ## tanstack add
 
-Add add-ons to an existing project. Run from the project root.
+Add add-ons to an existing project.
 
-```sh
-tanstack add <addon-id> [addon-id...] [options]
+```bash
+tanstack add [add-on...] [options]
 ```
 
-### Options
+| Option | Description |
+|--------|-------------|
+| `--forced` | Force add-on installation even if conflicts exist |
 
-| Flag | Description |
-|---|---|
-| `--framework <name>` | Target framework |
-| `--json` | Output as JSON |
-
-### Examples
-
-```sh
+```bash
+# Examples
 tanstack add clerk drizzle
-tanstack add tanstack-query sentry
+tanstack add tanstack-query,tanstack-form
+```
+
+Visual setup is available at `https://tanstack.com/builder`.
+
+---
+
+## tanstack add-on
+
+Create and manage custom add-ons.
+
+### init
+
+Extract add-on from current project:
+
+```bash
+tanstack add-on init
+```
+
+Creates `.add-on/` folder with `info.json` and `assets/`.
+
+### compile
+
+Rebuild after changes:
+
+```bash
+tanstack add-on compile
+```
+
+See [Creating Add-ons](./creating-add-ons.md) for full guide.
+
+---
+
+## tanstack template
+
+Create reusable project templates.
+
+### init
+
+```bash
+tanstack template init
+```
+
+Creates `template-info.json` and `template.json`.
+
+### compile
+
+```bash
+tanstack template compile
+```
+
+See [Templates](./templates.md) for full guide.
+
+## tanstack libraries
+
+List TanStack libraries with optional group filtering.
+
+```bash
+tanstack libraries [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--group <group>` | Filter by group: `state`, `headlessUI`, `performance`, `tooling` |
+| `--json` | Output machine-readable JSON |
+
+```bash
+tanstack libraries
+tanstack libraries --group state --json
 ```
 
 ---
 
 ## tanstack doc
 
-Fetch a TanStack documentation page by library and path. Returns the full content of the doc page.
+Fetch a TanStack documentation page by library and path.
 
-```sh
+```bash
 tanstack doc <library> <path> [options]
 ```
 
-### Options
+| Option | Description |
+|--------|-------------|
+| `--docs-version <version>` | Docs version (default: `latest`) |
+| `--json` | Output machine-readable JSON |
 
-| Flag | Description |
-|---|---|
-| `--docs-version <version>` | Documentation version (e.g. `v5`) |
-| `--json` | Output as JSON |
-
-### Arguments
-
-- `<library>` — The TanStack library ID (e.g. `router`, `query`, `start`, `table`, `form`, `virtual`, `store`, `db`, `ai`, `pacer`, `hotkeys`, `devtools`, `cli`)
-- `<path>` — The doc page path within that library (e.g. `framework/react/guide/data-loading`, `framework/react/overview`)
-
-### Examples
-
-```sh
+```bash
 tanstack doc router framework/react/guide/data-loading
 tanstack doc query framework/react/overview --docs-version v5 --json
-tanstack doc start framework/react/guide/server-functions --json
 ```
-
-### Tips
-
-- Use `tanstack search-docs` first if you don't know the exact path
-- The path structure typically follows: `framework/<framework>/guide/<topic>` or `framework/<framework>/reference/<api>`
-- Use `tanstack libraries --json` to get valid library IDs
 
 ---
 
 ## tanstack search-docs
 
-Search TanStack documentation across libraries.
+Search TanStack documentation.
 
-```sh
-tanstack search-docs "<query>" [options]
+```bash
+tanstack search-docs <query> [options]
 ```
 
-### Options
+| Option | Description |
+|--------|-------------|
+| `--library <id>` | Filter by library ID |
+| `--framework <name>` | Filter by framework |
+| `--limit <n>` | Max results (default `10`, max `50`) |
+| `--json` | Output machine-readable JSON |
 
-| Flag | Description |
-|---|---|
-| `--library <id>` | Limit search to a specific library |
-| `--framework <name>` | Filter by framework (e.g. `react`, `solid`) |
-| `--json` | Output as JSON |
-
-### Examples
-
-```sh
-tanstack search-docs "server functions" --library start --json
+```bash
+tanstack search-docs "server functions" --library start
 tanstack search-docs loaders --library router --framework react --json
-tanstack search-docs "mutations" --library query --json
-tanstack search-docs "virtual scroll" --library virtual --json
-```
-
----
-
-## tanstack libraries
-
-List all TanStack libraries with metadata (versions, descriptions, docs links).
-
-```sh
-tanstack libraries [options]
-```
-
-### Options
-
-| Flag | Description |
-|---|---|
-| `--json` | Output as JSON |
-
-### Example
-
-```sh
-tanstack libraries --json
 ```
 
 ---
 
 ## tanstack ecosystem
 
-List ecosystem partner recommendations (auth providers, databases, ORMs, deployment targets, etc.).
+List ecosystem partner recommendations.
 
-```sh
+```bash
 tanstack ecosystem [options]
 ```
 
-### Options
+| Option | Description |
+|--------|-------------|
+| `--category <category>` | Filter by category |
+| `--library <id>` | Filter by TanStack library |
+| `--json` | Output machine-readable JSON |
 
-| Flag | Description |
-|---|---|
-| `--json` | Output as JSON |
-
-### Example
-
-```sh
-tanstack ecosystem --json
+```bash
+tanstack ecosystem --category database
+tanstack ecosystem --library router --json
 ```
 
 ---
 
 ## tanstack pin-versions
 
-Pin TanStack package versions to avoid conflicts. Removes `^` from version ranges for TanStack packages and adds any missing peer dependencies.
+Pin TanStack package versions to avoid conflicts.
 
-```sh
+```bash
 tanstack pin-versions
 ```
 
-Run from the project root. Useful after upgrading or when encountering version mismatch issues.
+Removes `^` from version ranges for TanStack packages and adds any missing peer dependencies.
 
 ---
 
-## tanstack addon
+## Configuration
 
-Create and manage custom add-ons.
+Projects include `.tanstack.json`:
 
-```sh
-tanstack addon init [name]
+```json
+{
+  "version": 1,
+  "projectName": "my-app",
+  "framework": "react",
+  "mode": "file-router",
+  "typescript": true,
+  "tailwind": true,
+  "packageManager": "pnpm",
+  "chosenAddOns": ["tanstack-query", "clerk"]
+}
 ```
 
-Creates a `.add-on/` folder with `info.json` and `assets/`. See the "Creating Add-ons" docs for the full authoring guide.
-
----
-
-## tanstack starter
-
-Create reusable project starters (preset configurations).
-
-```sh
-# Initialize starter from current project
-tanstack starter init
-
-# Compile starter after editing starter-info.json
-tanstack starter compile
-```
-
-### Workflow
-
-1. Create a project with your desired setup: `tanstack create my-preset --add-ons clerk,drizzle,sentry`
-2. Initialize: `cd my-preset && tanstack starter init`
-3. Edit `starter-info.json` (name, description, banner)
-4. Compile: `tanstack starter compile`
-5. Use: `tanstack create new-app --starter ./starter.json`
-
----
-
-## Global Notes
-
-- **`--json` flag**: Available on all introspection/query commands. Always use it when parsing output programmatically.
-- **Global install**: The CLI is installed globally via bun (`bun add -g @tanstack/cli`). Run commands directly as `tanstack <command>`.
-- **Visual builder**: For interactive visual setup, direct users to https://tanstack.com/builder
-- **Framework support**: React is the default and most complete. Solid is also supported. Always specify `--framework` when querying framework-specific data.
+Used by `add-on init` and `template init` to detect changes.
