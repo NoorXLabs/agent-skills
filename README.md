@@ -9,6 +9,7 @@ Each skill is a directory containing a `SKILL.md` (with `name` + `description` f
 | Skill | What it does |
 |-------|--------------|
 | [`tanstack-cli`](skills/tanstack-cli/) | Uses the TanStack CLI (`@tanstack/cli`) as the source of truth for TanStack docs, libraries, add-ons, scaffolding, and ecosystem info. Replaces the deprecated TanStack MCP server. |
+| [`use-codex`](skills/use-codex/) | Delegates implementation, refactoring, debugging, diagnosis, and research to the Codex CLI, with guidance for full-access execution, verification, and parallel orchestration. |
 
 ## Installing
 
