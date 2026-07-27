@@ -13,13 +13,13 @@ description: >-
 
 ## Enforce the role boundary
 
-- Keep Claude as the control plane: scope tasks, launch workers, inspect status
+- Keep the orchestrator as the control plane: scope tasks, launch workers, inspect status
   and diffs, run acceptance checks, and approve or reject results.
 - Make Codex the execution plane: explore the repository and GitHub, implement,
   test, repair rejected work, and perform source-changing integration.
-- Do not have Claude create or edit source files, apply patches, resolve source
+- Do not have the orchestrator create or edit source files, apply patches, resolve source
   conflicts, or make corrective changes, even when the fix looks trivial.
-- Allow Claude to run read-only inspection and verification commands and manage
+- Allow the orchestrator to run read-only inspection and verification commands and manage
   worker, session, and worktree lifecycles. Delegate every source change back to
   Codex.
 - Treat GitHub reads, local repository writes, and GitHub remote mutations as
