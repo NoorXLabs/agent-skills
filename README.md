@@ -8,6 +8,7 @@ Each skill is a directory containing a `SKILL.md` (with `name` + `description` f
 
 | Skill | What it does |
 |-------|--------------|
+| [`clarify-intent`](skills/clarify-intent/) | Manual-only (`/clarify-intent`). Asks one round of 2–5 clarifying questions with suggested answers, restates the goal and what "done" means, then starts the work. |
 | [`tanstack-cli`](skills/tanstack-cli/) | Uses the TanStack CLI (`@tanstack/cli`) as the source of truth for TanStack docs, libraries, add-ons, scaffolding, and ecosystem info. Replaces the deprecated TanStack MCP server. |
 | [`use-codex`](skills/use-codex/) | Makes Claude the orchestrator and acceptance gate while Codex workers explore GitHub, implement and test locally, repair rejected work, and return explicit session-aware reports. |
 
